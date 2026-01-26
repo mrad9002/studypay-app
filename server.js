@@ -3,7 +3,11 @@ const { HfInference } = require('@huggingface/inference');
 const path = require('path');
 
 const app = express();
-const hf = new HfInference(process.env.HF_TOKEN); // Your free Hugging Face token from env
+
+// Use the new router endpoint (required in 2026)
+const hf = new HfInference(process.env.HF_TOKEN, {
+  apiUrl: 'https://router.huggingface.co/hf-inference'  // New unified endpoint
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -18,32 +22,36 @@ app.post('/generate-questions', async (req, res) => {
     const prompt = `Generate exactly 3 exam-style questions for ${board} ${subject} on the topic "${topic}". Each question must include: the question text, the correct answer, and marks (1-5). Output ONLY a valid JSON array like: [{"q": "Question text", "a": "Correct answer", "marks": 3}, ...]. No extra text before or after the JSON.`;
 
     const response = await hf.textGeneration({
-      model: 'mistralai/Mistral-7B-Instruct-v0.2', // Free model on HF; better quality
+      model: 'mistralai/Mistral-7B-Instruct-v0.2',
       inputs: prompt,
       parameters: { max_new_tokens: 400, temperature: 0.7 }
     });
 
-    let generated = response.generated_text.replace(prompt, '').trim();
+    let generated = response.generated_text.trim();
+    // Clean up any prompt echo or extras
+    generated = generated.replace(/.*?\[/s, '[').replace(/\].*?$/, ']').trim();
+
     let questions;
     try {
       questions = JSON.parse(generated);
-    } catch (e) {
-      // Simple fallback if AI output isn't perfect JSON
+    } catch (parseError) {
+      console.error('JSON parse failed:', parseError);
+      // Very basic fallback
       questions = [
-        { q: 'Fallback Question 1: What is 2+2?', a: '4', marks: 1 },
-        { q: 'Fallback Question 2: Define gravity.', a: 'Force pulling objects together.', marks: 2 },
-        { q: 'Fallback Question 3: Solve x=5.', a: 'x=5', marks: 1 }
+        { q: `Fallback Q1 for ${topic}`, a: 'Sample answer', marks: 2 },
+        { q: `Fallback Q2 for ${topic}`, a: 'Another answer', marks: 3 },
+        { q: `Fallback Q3 for ${topic}`, a: 'Final answer', marks: 1 }
       ];
     }
 
-    res.json(questions.slice(0, 3)); // Send 3 questions
+    res.json(questions.slice(0, 3));
   } catch (error) {
-    console.error(error);
-    res.status(500).json([{ q: 'Error: AI failed. Try again later.', a: 'N/A', marks: 0 }]);
+    console.error('HF error:', error.message);
+    res.status(500).json([{ q: 'AI generation failed (router issue?). Try again.', a: 'N/A', marks: 0 }]);
   }
 });
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`StudyPay app running on port ${port}`);
+  console.log(`StudyPay running on port ${port}`);
 });
