@@ -1,12 +1,12 @@
 const express = require('express');
-const { HfInference } = require('@huggingface/inference');
+const { InferenceClient } = require('@huggingface/inference');
 const path = require('path');
 
 const app = express();
 
-// Use the new router endpoint (required in 2026)
-const hf = new HfInference(process.env.HF_TOKEN, {
-  apiUrl: 'https://router.huggingface.co/hf-inference'  // New unified endpoint
+const client = new InferenceClient({
+  apiKey: process.env.HF_TOKEN  // Your free token
+  // No need for explicit baseURL – client defaults to router.huggingface.co in latest versions
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -19,35 +19,39 @@ app.get('/', (req, res) => {
 app.post('/generate-questions', async (req, res) => {
   const { board, subject, topic } = req.body;
   try {
-    const prompt = `Generate exactly 3 exam-style questions for ${board} ${subject} on the topic "${topic}". Each question must include: the question text, the correct answer, and marks (1-5). Output ONLY a valid JSON array like: [{"q": "Question text", "a": "Correct answer", "marks": 3}, ...]. No extra text before or after the JSON.`;
+    const prompt = `Generate exactly 3 exam-style questions for ${board} ${subject} on the topic "${topic}". Each must have: question text, correct answer, marks (1-5). Output ONLY valid JSON array: [{"q": "question", "a": "answer", "marks": number}, ...] No extra text.`;
 
-    const response = await hf.textGeneration({
-      model: 'mistralai/Mistral-7B-Instruct-v0.2',
+    // Use new client syntax – model with :fastest to route optimally on free tier
+    const response = await client.textGeneration({
+      model: 'mistralai/Mistral-7B-Instruct-v0.2:fastest',  // Or try 'gpt2:fastest' for ultra-reliable fallback
       inputs: prompt,
-      parameters: { max_new_tokens: 400, temperature: 0.7 }
+      parameters: {
+        max_new_tokens: 400,
+        temperature: 0.7,
+        return_full_text: false  // Avoid echoing prompt
+      }
     });
 
     let generated = response.generated_text.trim();
-    // Clean up any prompt echo or extras
-    generated = generated.replace(/.*?\[/s, '[').replace(/\].*?$/, ']').trim();
 
     let questions;
     try {
+      // Clean common extras
+      generated = generated.match(/\[.*\]/s)?.[0] || generated;
       questions = JSON.parse(generated);
-    } catch (parseError) {
-      console.error('JSON parse failed:', parseError);
-      // Very basic fallback
+    } catch (parseErr) {
+      console.error('Parse error:', parseErr);
       questions = [
-        { q: `Fallback Q1 for ${topic}`, a: 'Sample answer', marks: 2 },
-        { q: `Fallback Q2 for ${topic}`, a: 'Another answer', marks: 3 },
-        { q: `Fallback Q3 for ${topic}`, a: 'Final answer', marks: 1 }
+        { q: `Sample Q1: Explain ${topic}`, a: 'Sample answer', marks: 2 },
+        { q: `Sample Q2: Solve for ${topic}`, a: 'x=42', marks: 3 },
+        { q: `Sample Q3: Define ${topic}`, a: 'Definition here', marks: 1 }
       ];
     }
 
     res.json(questions.slice(0, 3));
   } catch (error) {
-    console.error('HF error:', error.message);
-    res.status(500).json([{ q: 'AI generation failed (router issue?). Try again.', a: 'N/A', marks: 0 }]);
+    console.error('Inference error:', error.message);
+    res.status(500).json([{ q: 'AI error – try again or different topic.', a: 'N/A', marks: 0 }]);
   }
 });
 

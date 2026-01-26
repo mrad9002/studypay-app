@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyPay - Earn While Studying!</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f0f8ff; padding: 20px; color: #333; }
+        h1 { color: #2c3e50; }
+        select, button { padding: 10px; margin: 10px; font-size: 18px; border-radius: 5px; border: 1px solid #ccc; }
+        .question { margin: 20px auto; text-align: left; max-width: 600px; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        textarea { width: 100%; padding: 8px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; }
+        #markscheme { display: none; background: #e8f5e9; padding: 15px; border-radius: 10px; max-width: 600px; margin: 20px auto; }
+        #result { margin: 20px; font-size: 24px; font-weight: bold; }
+        .earn { color: green; }
+        .yourcut { color: purple; font-size: 18px; }
+        .stake-info { background: #fff3cd; padding: 15px; border-radius: 10px; margin: 20px auto; max-width: 600px; }
+    </style>
+</head>
+<body>
+    <h1>StudyPay 💰</h1>
+    <p>Earn real money while studying! Join a challenge: Stake $0.50–$1 (via bKash/PromptPay to [your link here]). High scorers split the pot minus my 20% platform cut. No money from me—funded by users!</p>
+    
+    <div class="stake-info">
+        <p><strong>How payouts work:</strong> Send stake to my bKash/PromptPay: [add your number/link]. Winners get 80% of pot; I keep 20% cut. Message me on WhatsApp: [your number] for details.</p>
+    </div>
+    
+    <select id="board">
+        <option value="">Choose Exam Board</option>
+        <option>Cambridge IGCSE</option>
+        <option>Edexcel IGCSE</option>
+    </select><br>
+    
+    <select id="subject">
+        <option value="">Choose Subject</option>
+        <option>Mathematics</option>
+        <option>Physics</option>
+        <option>Biology</option>
+        <option>Chemistry</option>
+    </select><br>
+    
+    <select id="topic">
+        <option value="">Choose Topic</option>
+    </select><br>
+    
+    <button onclick="generatePaper()">Generate AI Question Paper</button>
+    
+    <div id="paper"></div>
+    <div id="markscheme"></div>
+    <div id="result"></div>
+    <p class="yourcut" id="yourcut" style="display:none;">My 20% cut = $0.20 (per $1 payout) 💰</p>
+    
+    <script>
+        const topics = {
+            Mathematics: ["Algebra", "Geometry", "Trigonometry", "Statistics"],
+            Physics: ["Forces", "Energy", "Electricity", "Waves"],
+            Biology: ["Cells", "Photosynthesis", "Human Body", "Genetics"],
+            Chemistry: ["Atoms", "Reactions", "Periodic Table", "Acids & Bases"]
+        };
+        
+        document.getElementById("subject").onchange = function() {
+            let subj = this.value;
+            let topicSelect = document.getElementById("topic");
+            topicSelect.innerHTML = "<option value=''>Choose Topic</option>";
+            if (subj) {
+                topics[subj].forEach(t => {
+                    let opt = document.createElement("option");
+                    opt.value = t;
+                    opt.text = t;
+                    topicSelect.add(opt);
+                });
+            }
+        };
+        
+        async function generatePaper() {
+            let board = document.getElementById("board").value;
+            let subject = document.getElementById("subject").value;
+            let topic = document.getElementById("topic").value;
+            if (!board || !subject || !topic) {
+                alert("Select board, subject, and topic first!");
+                return;
+            }
+            
+            const response = await fetch('/generate-questions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ board, subject, topic })
+            });
+            const questions = await response.json();
+            
+            let paperHTML = `<h2>${board} - ${subject} - ${topic} (AI Generated)</h2><p>Answer all. Submit to unlock mark scheme and score.</p>`;
+            window.currentQuestions = questions;
+            
+            questions.forEach((qst, i) => {
+                paperHTML += `<div class="question">
+                    <p><strong>Q${i+1}:</strong> ${qst.q} (${qst.marks} marks)</p>
+                    <textarea rows="3" placeholder="Your answer" id="ans${i}"></textarea>
+                </div>`;
+            });
+            paperHTML += `<button onclick="submitPaper()">Submit Answers</button>`;
+            document.getElementById("paper").innerHTML = paperHTML;
+            document.getElementById("markscheme").style.display = "none";
+            document.getElementById("result").innerHTML = "";
+            document.getElementById("yourcut").style.display = "none";
+        }
+        
+        function submitPaper() {
+            let totalMarks = 0;
+            let obtained = 0;
+            let schemeHTML = "<h2>Mark Scheme (Unlocked!)</h2>";
+            
+            window.currentQuestions.forEach((qst, i) => {
+                let userAns = document.getElementById(`ans${i}`).value.trim().toLowerCase();
+                let correct = qst.a.toLowerCase();
+                let correctMark = userAns.includes(correct) ? qst.marks : 0;
+                obtained += correctMark;
+                totalMarks += qst.marks;
+                
+                schemeHTML += `<div class="question">
+                    <p><strong>Q${i+1}:</strong> ${qst.q}</p>
+                    <p><strong>Answer:</strong> ${qst.a} (${qst.marks} marks)</p>
+                    <p>Your answer: ${userAns || "None"}</p>
+                    <p style="color:${correctMark ? 'green' : 'red'}">You got ${correctMark}/${qst.marks}</p>
+                </div>`;
+            });
+            
+            let percentage = (obtained / totalMarks) * 100;
+            let resultHTML = `Score: ${percentage.toFixed(0)}% (${obtained}/${totalMarks})`;
+            
+            if (percentage >= 70) {
+                resultHTML += `<div class="earn">🎉 You won! Claim from pot (minus 20% cut).</div>`;
+                document.getElementById("yourcut").style.display = "block";
+            } else {
+                resultHTML += `<div>Try again! Need 70%+ to win pot share.</div>`;
+            }
+            
+            document.getElementById("markscheme").innerHTML = schemeHTML;
+            document.getElementById("markscheme").style.display = "block";
+            document.getElementById("result").innerHTML = resultHTML;
+            document.getElementById("paper").innerHTML += "<p>Submitted! See below.</p>";
+        }
+    </script>
+    
+    <footer>
+        <p>Made by Mahir • Users fund payouts via stakes— I get 20% cut. WhatsApp me for challenges: [your number]</p>
+        <p>Share with friends to build bigger pots!</p>
+    </footer>
+</body>
+</html>

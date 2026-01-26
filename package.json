@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "@huggingface/inference": "^2.8.0"
+    "@huggingface/inference": "^4.13.10"
   },
   "engines": {
     "node": ">=18"
