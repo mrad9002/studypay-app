@@ -25,7 +25,7 @@ Output ONLY a valid JSON array like this:
 No extra text, explanations, or code blocks before or after the JSON.`;
 
     const response = await client.textGeneration({
-      model: 'gpt2',  // Reliable free model – no suffix needed
+      model: 'microsoft/Phi-3-mini-4k-instruct',  // Reliable free model – no suffix needed
       inputs: prompt,
       parameters: {
         max_new_tokens: 350,
