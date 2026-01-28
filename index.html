@@ -1,63 +1,254 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudyPay - Earn While Prepping Exams</title>
-    <style>
-        body { font-family: Arial; text-align: center; background: #f0f8ff; padding: 20px; }
-        h1 { color: #2c3e50; }
-        select, button { padding: 10px; margin: 10px; font-size: 18px; }
-        .question { margin: 20px; text-align: left; display: inline-block; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        textarea { width: 100%; padding: 8px; margin-top: 5px; }
-        #markscheme { display: none; background: #e8f5e9; padding: 15px; border-radius: 10px; }
-        #result { margin: 20px; font-size: 24px; font-weight: bold; }
-        .earn { color: green; }
-        .yourcut { display: none; } /* Hidden in app, in terms */
-        .stake-info { background: #fff3cd; padding: 15px; border-radius: 10px; margin: 20px; }
-        a { color: #007bff; text-decoration: none; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Study & Earn - Mahir's App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #1a73e8;
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin: 20px 0 8px;
+      font-weight: bold;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    textarea {
+      height: 120px;
+    }
+    button {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      padding: 14px 24px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 20px;
+      width: 100%;
+    }
+    button:hover {
+      background: #0d65d6;
+    }
+    #questions {
+      margin-top: 30px;
+    }
+    .question {
+      background: #f9fbfc;
+      padding: 16px;
+      margin: 12px 0;
+      border-left: 4px solid #1a73e8;
+      border-radius: 6px;
+    }
+    .answer-input {
+      margin-top: 10px;
+    }
+    #submitBtn {
+      margin-top: 30px;
+    }
+    #result, #markScheme {
+      margin-top: 30px;
+      padding: 20px;
+      background: #e8f0fe;
+      border-radius: 8px;
+    }
+    #markScheme {
+      display: none;
+    }
+    .hidden-cut {
+      font-size: 0.9em;
+      color: #666;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
-    <h1>StudyPay 💰</h1>
-    <p>Custom practice papers for exams—earn from challenges! Stake small via bKash/PromptPay, high scorers win pot. Agree to <a href="[your Google Doc ToS link]" target="_blank">Terms</a> (fees apply).</p>
-    
-    <div class="stake-info">
-        <p>Stake $0.50+ to join—funded by players. Message WhatsApp [your number] for pot details.</p>
-    </div>
-    
-    <select id="board">
-        <option value="">Choose Board</option>
-        <option>Cambridge IGCSE</option>
-        <option>Edexcel IGCSE</option>
-    </select><br>
-    
-    <select id="subject">
-        <option value="">Choose Subject</option>
-        <option>Mathematics</option>
-        <option>Physics</option>
-        <option>Biology</option>
-        <option>Chemistry</option>
-    </select><br>
-    
-    <select id="topic">
-        <option value="">Choose Topic</option>
-    </select><br>
-    
-    <button onclick="generatePaper()">Generate Practice Paper</button>
-    
-    <div id="paper"></div>
-    <div id="markscheme"></div>
-    <div id="result"></div>
-    <p class="yourcut" id="yourcut">Platform fee in terms.</p>
-    
-    <script>
-        // Same JS as before – no change needed for now
-        // (Paste the script from your current index.html here if not already)
-    </script>
-    
-    <footer>
-        <p>Made by Mahir – Help students earn, I get fair cut via terms.</p>
-    </footer>
+
+<div class="container">
+  <h1>Study & Earn 💰</h1>
+  <p style="text-align:center">
+    Fill in your details → get a custom question paper → finish it → if you do well you earn money.<br>
+    <small>(Payouts come from challenge pots funded by players. Platform takes 20% fee – see terms)</small>
+  </p>
+
+  <label>My syllabus is...</label>
+  <textarea id="syllabus" placeholder="Example: Cambridge IGCSE Mathematics 0580 2024-2026, or Edexcel A-Level Physics, or just 'Thai grade 10 math'"></textarea>
+
+  <label>I am in grade / level</label>
+  <input type="text" id="grade" placeholder="Example: Grade 10, Year 11, AS Level">
+
+  <label>Subject</label>
+  <input type="text" id="subject" placeholder="Example: Mathematics, Physics, Biology">
+
+  <label>Topic(s)</label>
+  <input type="text" id="topic" placeholder="Example: Algebra, Forces and motion, Cell structure">
+
+  <button id="generateBtn">Generate Question Paper</button>
+
+  <div id="questions"></div>
+
+  <button id="submitBtn" style="display:none;">Submit & See Score + Mark Scheme</button>
+
+  <div id="result"></div>
+  <div id="markScheme"></div>
+
+  <div class="hidden-cut">
+    By using this app you agree to the terms (20% platform fee on payouts).
+    Contact Mahir on WhatsApp for payouts / questions.
+  </div>
+</div>
+
+<script>
+// This part makes the page work without any server
+// In the future we can connect it to Groq / OpenAI / Gemini free API
+
+const generateBtn = document.getElementById('generateBtn');
+const submitBtn = document.getElementById('submitBtn');
+const questionsDiv = document.getElementById('questions');
+const resultDiv = document.getElementById('result');
+const markSchemeDiv = document.getElementById('markScheme');
+
+let currentQuestions = [];
+
+generateBtn.onclick = () => {
+  const syllabus = document.getElementById('syllabus').value.trim();
+  const grade = document.getElementById('grade').value.trim();
+  const subject = document.getElementById('subject').value.trim();
+  const topic = document.getElementById('topic').value.trim();
+
+  if (!syllabus || !subject || !topic) {
+    alert("Please fill syllabus, subject and topic at least.");
+    return;
+  }
+
+  // For now we simulate a question paper (later this calls AI)
+  currentQuestions = [
+    {
+      number: 1,
+      text: `Example question for ${topic} (${subject}, ${grade})`,
+      marks: 4,
+      type: "short",
+      answer: "This is the correct answer (hidden until submit)",
+      markscheme: "Award 4 marks for full explanation including key terms..."
+    },
+    {
+      number: 2,
+      text: "Another question on the same topic",
+      marks: 3,
+      type: "short",
+      answer: "Correct short answer here",
+      markscheme: "1 mark per key point, max 3"
+    },
+    {
+      number: 3,
+      text: "MCQ example: What is the main formula for " + topic + "?",
+      marks: 2,
+      type: "mcq",
+      options: ["A) E=mc²", "B) F=ma", "C) v=u+at", "D) None"],
+      answer: "B",
+      markscheme: "1 mark for correct choice, 1 for working if shown"
+    }
+  ];
+
+  // Show questions
+  let html = "<h2>Your Question Paper</h2>";
+  currentQuestions.forEach(q => {
+    html += `<div class="question">
+      <strong>Q${q.number}) (${q.marks} marks)</strong><br>
+      ${q.text}<br>`;
+    if (q.type === "mcq") {
+      q.options.forEach((opt, i) => {
+        const letter = String.fromCharCode(65 + i);
+        html += `<label><input type="radio" name="q${q.number}" value="${letter}"> ${letter}) ${opt}</label><br>`;
+      });
+    } else {
+      html += `<textarea class="answer-input" rows="3" placeholder="Write your answer here..." data-q="${q.number}"></textarea>`;
+    }
+    html += "</div>";
+  });
+
+  questionsDiv.innerHTML = html;
+  submitBtn.style.display = "block";
+  resultDiv.innerHTML = "";
+  markSchemeDiv.innerHTML = "";
+  markSchemeDiv.style.display = "none";
+};
+
+submitBtn.onclick = () => {
+  let totalMarks = 0;
+  let earned = 0;
+  let schemeHtml = "<h2>Mark Scheme & Your Answers</h2>";
+
+  currentQuestions.forEach(q => {
+    totalMarks += q.marks;
+    let userAnswer = "";
+    let correct = false;
+
+    if (q.type === "mcq") {
+      const selected = document.querySelector(`input[name="q${q.number}"]:checked`);
+      userAnswer = selected ? selected.value : "No answer";
+      correct = userAnswer === q.answer;
+    } else {
+      const textarea = document.querySelector(`textarea[data-q="${q.number}"]`);
+      userAnswer = textarea ? textarea.value.trim() : "";
+      // Very simple check (later improve with AI)
+      correct = userAnswer.toLowerCase().includes(q.answer.toLowerCase().slice(0, 10));
+    }
+
+    if (correct) earned += q.marks;
+
+    schemeHtml += `
+      <div class="question">
+        <strong>Q${q.number}) ${q.marks} marks</strong><br>
+        ${q.text}<br>
+        <strong>Your answer:</strong> ${userAnswer || "—"}<br>
+        <strong>Correct answer:</strong> ${q.answer}<br>
+        <strong>Mark scheme:</strong> ${q.markscheme}<br>
+        <strong>You got:</strong> ${correct ? q.marks : 0}/${q.marks}
+      </div>`;
+  });
+
+  const percent = Math.round((earned / totalMarks) * 100);
+  let resultText = `<h2>Your Score: ${percent}% (${earned}/${totalMarks})</h2>`;
+
+  if (percent >= 70) {
+    resultText += `<p class="earn">🎉 Great job! You qualify for a payout from the challenge pot.<br>
+    Message Mahir on WhatsApp to claim (pot funded by players, platform takes 20% fee as per terms).</p>`;
+  } else {
+    resultText += `<p>Keep practicing! Try another paper to improve your score and earn.</p>`;
+  }
+
+  resultDiv.innerHTML = resultText;
+  markSchemeDiv.innerHTML = schemeHtml;
+  markSchemeDiv.style.display = "block";
+  submitBtn.style.display = "none";
+};
+</script>
+
 </body>
 </html>
