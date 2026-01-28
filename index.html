@@ -1,76 +1,106 @@
-const express = require('express');
-const fetch = require('node-fetch'); // Add this dependency for Groq calls
-const path = require('path');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyPay - Get Paid to Study</title>
+    <style>
+        body { font-family: Arial; text-align: center; background: #f0f8ff; padding: 20px; }
+        h1 { color: #2c3e50; }
+        input, textarea { padding: 10px; margin: 10px; font-size: 18px; width: 80%; }
+        button { padding: 10px; font-size: 18px; }
+        .question { margin: 20px; text-align: left; background: white; padding: 15px; border-radius: 10px; }
+        #markscheme { display: none; background: #e8f5e9; padding: 15px; border-radius: 10px; }
+        #result { margin: 20px; font-size: 24px; font-weight: bold; }
+        .earn { color: green; }
+    </style>
+</head>
+<body>
+    <h1>StudyPay 💰</h1>
+    <p>Enter your details to generate a custom question paper. Complete it to earn from challenges (stake via bKash/PromptPay, high scorers win pot). Agree to <a href="[paste your Google Doc terms link here]" target="_blank">Terms</a> (fees apply).</p>
 
-const app = express();
+    <textarea id="syllabus" placeholder="My syllabus is (e.g., Cambridge IGCSE Math 0580 2024)" rows="3"></textarea><br>
+    <input id="grade" placeholder="I am from grade (e.g., 10)" type="text"><br>
+    <input id="subject" placeholder="Subject (e.g., Mathematics)" type="text"><br>
+    <input id="topic" placeholder="Topic (e.g., Algebra)" type="text"><br>
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+    <button onclick="generatePaper()">Generate Question Paper</button>
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+    <div id="paper"></div>
+    <div id="markscheme"></div>
+    <div id="result"></div>
 
-app.post('/generate-questions', async (req, res) => {
-  const { syllabus, grade, subject, topic } = req.body;
-  try {
-    const prompt = `You are an expert exam question writer for Cambridge and Edexcel syllabi.
-Create a question paper with 5 questions (mix MCQ, short answer) for:
-- Syllabus: ${syllabus}
-- Grade: ${grade}
-- Subject: ${subject}
-- Topic: ${topic}
+    <footer>
+        <p>Made by Mahir. WhatsApp [your number] for challenge details.</p>
+    </footer>
 
-Output ONLY JSON:
-{
-  "title": "Question Paper - ${subject} ${topic}",
-  "questions": [
-    {"number": 1, "text": "Question text", "type": "mcq/short", "marks": 2, "options": ["A", "B", "C", "D"] if mcq, "answer": "Correct answer", "markscheme": "Marking notes"}
-  ]
-}
-No extra text.`;
+    <script>
+        async function generatePaper() {
+            const syllabus = document.getElementById("syllabus").value;
+            const grade = document.getElementById("grade").value;
+            const subject = document.getElementById("subject").value;
+            const topic = document.getElementById("topic").value;
+            if (!syllabus || !grade || !subject || !topic) {
+                alert("Fill all fields!");
+                return;
+            }
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama3-8b-8192', // Free model on Groq
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 1000
-      })
-    });
+            const response = await fetch('/generate-questions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ syllabus, grade, subject, topic })
+            });
+            const paper = await response.json();
 
-    const data = await response.json();
-    let generated = data.choices[0].message.content.trim();
+            let paperHTML = `<h2>${paper.title}</h2><p>Answer all. Submit to see mark scheme.</p>`;
+            window.currentPaper = paper;
+            paper.questions.forEach((qst, i) => {
+                paperHTML += `<div class="question">
+                    <p><strong>Q${qst.number}:</strong> ${qst.text} (${qst.marks} marks)</p>
+                    ${qst.type === 'mcq' ? qst.options.map(opt => `<input type="radio" name="q${i}" value="${opt}"> ${opt}<br>`).join('') : ''}
+                    <textarea rows="3" placeholder="Your answer" id="ans${i}"></textarea>
+                </div>`;
+            });
+            paperHTML += `<button onclick="submitPaper()">Submit Answers</button>`;
+            document.getElementById("paper").innerHTML = paperHTML;
+            document.getElementById("markscheme").style.display = "none";
+            document.getElementById("result").innerHTML = "";
+        }
 
-    let paper;
-    try {
-      paper = JSON.parse(generated);
-    } catch (e) {
-      paper = {
-        title: `Fallback Paper for ${subject} - ${topic}`,
-        questions: [
-          { number: 1, text: `What is a key concept in ${topic}?`, type: 'short', marks: 2, answer: 'Sample answer', markscheme: 'Award 2 marks for correct definition' },
-          { number: 2, text: `Solve simple problem on ${topic}.`, type: 'short', marks: 3, answer: 'Sample solution', markscheme: '1 mark for method, 2 for answer' },
-          { number: 3, text: `Multiple choice on ${topic}: A, B, C, D`, type: 'mcq', marks: 1, options: ['A', 'B', 'C', 'D'], answer: 'B', markscheme: 'Correct choice B' },
-          { number: 4, text: `Explain ${topic}.`, type: 'short', marks: 4, answer: 'Detailed explanation', markscheme: '2 marks for key points, 2 for example' },
-          { number: 5, text: `Another question on ${topic}.`, type: 'short', marks: 2, answer: 'Answer here', markscheme: 'Full marks for accuracy' }
-        ]
-      };
-    }
+        function submitPaper() {
+            let totalMarks = 0;
+            let obtained = 0;
+            let schemeHTML = "<h2>Mark Scheme</h2>";
 
-    res.json(paper);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ title: 'Error', questions: [] });
-  }
-});
+            window.currentPaper.questions.forEach((qst, i) => {
+                let userAns = document.getElementById(`ans${i}`).value.trim().toLowerCase();
+                let correct = qst.answer.toLowerCase();
+                let correctMark = userAns.includes(correct) ? qst.marks : 0; // Simple match
+                obtained += correctMark;
+                totalMarks += qst.marks;
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`App running on port ${port}`);
-});
+                schemeHTML += `<div class="question">
+                    <p><strong>Q${qst.number}:</strong> ${qst.text}</p>
+                    <p><strong>Answer:</strong> ${qst.answer}</p>
+                    <p><strong>Mark Scheme:</strong> ${qst.markscheme}</p>
+                    <p>Your answer: ${userAns || "No answer"}</p>
+                    <p style="color:${correctMark ? 'green' : 'red'}">You got ${correctMark}/${qst.marks}</p>
+                </div>`;
+            });
+
+            let percentage = (obtained / totalMarks) * 100;
+            let resultHTML = `<div>You scored ${percentage.toFixed(0)}% (${obtained}/${totalMarks})</div>`;
+
+            if (percentage >= 70) {
+                resultHTML += `<div class="earn">🎉 You won! Message for pot claim (terms apply).</div>`;
+            } else {
+                resultHTML += `<div>Keep practicing!</div>`;
+            }
+
+            document.getElementById("markscheme").innerHTML = schemeHTML;
+            document.getElementById("markscheme").style.display = "block";
+            document.getElementById("result").innerHTML = resultHTML;
+        }
+    </script>
+</body>
+</html>
