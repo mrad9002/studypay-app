@@ -1,254 +1,76 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Study & Earn - Mahir's App</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f0f4f8;
-      margin: 0;
-      padding: 20px;
-      color: #333;
-    }
-    .container {
-      max-width: 700px;
-      margin: 0 auto;
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }
-    h1 {
-      color: #1a73e8;
-      text-align: center;
-    }
-    label {
-      display: block;
-      margin: 20px 0 8px;
-      font-weight: bold;
-    }
-    input, textarea, select {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-    textarea {
-      height: 120px;
-    }
-    button {
-      background: #1a73e8;
-      color: white;
-      border: none;
-      padding: 14px 24px;
-      font-size: 18px;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 20px;
-      width: 100%;
-    }
-    button:hover {
-      background: #0d65d6;
-    }
-    #questions {
-      margin-top: 30px;
-    }
-    .question {
-      background: #f9fbfc;
-      padding: 16px;
-      margin: 12px 0;
-      border-left: 4px solid #1a73e8;
-      border-radius: 6px;
-    }
-    .answer-input {
-      margin-top: 10px;
-    }
-    #submitBtn {
-      margin-top: 30px;
-    }
-    #result, #markScheme {
-      margin-top: 30px;
-      padding: 20px;
-      background: #e8f0fe;
-      border-radius: 8px;
-    }
-    #markScheme {
-      display: none;
-    }
-    .hidden-cut {
-      font-size: 0.9em;
-      color: #666;
-      text-align: center;
-      margin-top: 20px;
-    }
-  </style>
-</head>
-<body>
+const express = require('express');
+const fetch = require('node-fetch'); // Add this dependency for Groq calls
+const path = require('path');
 
-<div class="container">
-  <h1>Study & Earn 💰</h1>
-  <p style="text-align:center">
-    Fill in your details → get a custom question paper → finish it → if you do well you earn money.<br>
-    <small>(Payouts come from challenge pots funded by players. Platform takes 20% fee – see terms)</small>
-  </p>
+const app = express();
 
-  <label>My syllabus is...</label>
-  <textarea id="syllabus" placeholder="Example: Cambridge IGCSE Mathematics 0580 2024-2026, or Edexcel A-Level Physics, or just 'Thai grade 10 math'"></textarea>
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-  <label>I am in grade / level</label>
-  <input type="text" id="grade" placeholder="Example: Grade 10, Year 11, AS Level">
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-  <label>Subject</label>
-  <input type="text" id="subject" placeholder="Example: Mathematics, Physics, Biology">
+app.post('/generate-questions', async (req, res) => {
+  const { syllabus, grade, subject, topic } = req.body;
+  try {
+    const prompt = `You are an expert exam question writer for Cambridge and Edexcel syllabi.
+Create a question paper with 5 questions (mix MCQ, short answer) for:
+- Syllabus: ${syllabus}
+- Grade: ${grade}
+- Subject: ${subject}
+- Topic: ${topic}
 
-  <label>Topic(s)</label>
-  <input type="text" id="topic" placeholder="Example: Algebra, Forces and motion, Cell structure">
+Output ONLY JSON:
+{
+  "title": "Question Paper - ${subject} ${topic}",
+  "questions": [
+    {"number": 1, "text": "Question text", "type": "mcq/short", "marks": 2, "options": ["A", "B", "C", "D"] if mcq, "answer": "Correct answer", "markscheme": "Marking notes"}
+  ]
+}
+No extra text.`;
 
-  <button id="generateBtn">Generate Question Paper</button>
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192', // Free model on Groq
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
+    });
 
-  <div id="questions"></div>
+    const data = await response.json();
+    let generated = data.choices[0].message.content.trim();
 
-  <button id="submitBtn" style="display:none;">Submit & See Score + Mark Scheme</button>
+    let paper;
+    try {
+      paper = JSON.parse(generated);
+    } catch (e) {
+      paper = {
+        title: `Fallback Paper for ${subject} - ${topic}`,
+        questions: [
+          { number: 1, text: `What is a key concept in ${topic}?`, type: 'short', marks: 2, answer: 'Sample answer', markscheme: 'Award 2 marks for correct definition' },
+          { number: 2, text: `Solve simple problem on ${topic}.`, type: 'short', marks: 3, answer: 'Sample solution', markscheme: '1 mark for method, 2 for answer' },
+          { number: 3, text: `Multiple choice on ${topic}: A, B, C, D`, type: 'mcq', marks: 1, options: ['A', 'B', 'C', 'D'], answer: 'B', markscheme: 'Correct choice B' },
+          { number: 4, text: `Explain ${topic}.`, type: 'short', marks: 4, answer: 'Detailed explanation', markscheme: '2 marks for key points, 2 for example' },
+          { number: 5, text: `Another question on ${topic}.`, type: 'short', marks: 2, answer: 'Answer here', markscheme: 'Full marks for accuracy' }
+        ]
+      };
+    }
 
-  <div id="result"></div>
-  <div id="markScheme"></div>
-
-  <div class="hidden-cut">
-    By using this app you agree to the terms (20% platform fee on payouts).
-    Contact Mahir on WhatsApp for payouts / questions.
-  </div>
-</div>
-
-<script>
-// This part makes the page work without any server
-// In the future we can connect it to Groq / OpenAI / Gemini free API
-
-const generateBtn = document.getElementById('generateBtn');
-const submitBtn = document.getElementById('submitBtn');
-const questionsDiv = document.getElementById('questions');
-const resultDiv = document.getElementById('result');
-const markSchemeDiv = document.getElementById('markScheme');
-
-let currentQuestions = [];
-
-generateBtn.onclick = () => {
-  const syllabus = document.getElementById('syllabus').value.trim();
-  const grade = document.getElementById('grade').value.trim();
-  const subject = document.getElementById('subject').value.trim();
-  const topic = document.getElementById('topic').value.trim();
-
-  if (!syllabus || !subject || !topic) {
-    alert("Please fill syllabus, subject and topic at least.");
-    return;
+    res.json(paper);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ title: 'Error', questions: [] });
   }
+});
 
-  // For now we simulate a question paper (later this calls AI)
-  currentQuestions = [
-    {
-      number: 1,
-      text: `Example question for ${topic} (${subject}, ${grade})`,
-      marks: 4,
-      type: "short",
-      answer: "This is the correct answer (hidden until submit)",
-      markscheme: "Award 4 marks for full explanation including key terms..."
-    },
-    {
-      number: 2,
-      text: "Another question on the same topic",
-      marks: 3,
-      type: "short",
-      answer: "Correct short answer here",
-      markscheme: "1 mark per key point, max 3"
-    },
-    {
-      number: 3,
-      text: "MCQ example: What is the main formula for " + topic + "?",
-      marks: 2,
-      type: "mcq",
-      options: ["A) E=mc²", "B) F=ma", "C) v=u+at", "D) None"],
-      answer: "B",
-      markscheme: "1 mark for correct choice, 1 for working if shown"
-    }
-  ];
-
-  // Show questions
-  let html = "<h2>Your Question Paper</h2>";
-  currentQuestions.forEach(q => {
-    html += `<div class="question">
-      <strong>Q${q.number}) (${q.marks} marks)</strong><br>
-      ${q.text}<br>`;
-    if (q.type === "mcq") {
-      q.options.forEach((opt, i) => {
-        const letter = String.fromCharCode(65 + i);
-        html += `<label><input type="radio" name="q${q.number}" value="${letter}"> ${letter}) ${opt}</label><br>`;
-      });
-    } else {
-      html += `<textarea class="answer-input" rows="3" placeholder="Write your answer here..." data-q="${q.number}"></textarea>`;
-    }
-    html += "</div>";
-  });
-
-  questionsDiv.innerHTML = html;
-  submitBtn.style.display = "block";
-  resultDiv.innerHTML = "";
-  markSchemeDiv.innerHTML = "";
-  markSchemeDiv.style.display = "none";
-};
-
-submitBtn.onclick = () => {
-  let totalMarks = 0;
-  let earned = 0;
-  let schemeHtml = "<h2>Mark Scheme & Your Answers</h2>";
-
-  currentQuestions.forEach(q => {
-    totalMarks += q.marks;
-    let userAnswer = "";
-    let correct = false;
-
-    if (q.type === "mcq") {
-      const selected = document.querySelector(`input[name="q${q.number}"]:checked`);
-      userAnswer = selected ? selected.value : "No answer";
-      correct = userAnswer === q.answer;
-    } else {
-      const textarea = document.querySelector(`textarea[data-q="${q.number}"]`);
-      userAnswer = textarea ? textarea.value.trim() : "";
-      // Very simple check (later improve with AI)
-      correct = userAnswer.toLowerCase().includes(q.answer.toLowerCase().slice(0, 10));
-    }
-
-    if (correct) earned += q.marks;
-
-    schemeHtml += `
-      <div class="question">
-        <strong>Q${q.number}) ${q.marks} marks</strong><br>
-        ${q.text}<br>
-        <strong>Your answer:</strong> ${userAnswer || "—"}<br>
-        <strong>Correct answer:</strong> ${q.answer}<br>
-        <strong>Mark scheme:</strong> ${q.markscheme}<br>
-        <strong>You got:</strong> ${correct ? q.marks : 0}/${q.marks}
-      </div>`;
-  });
-
-  const percent = Math.round((earned / totalMarks) * 100);
-  let resultText = `<h2>Your Score: ${percent}% (${earned}/${totalMarks})</h2>`;
-
-  if (percent >= 70) {
-    resultText += `<p class="earn">🎉 Great job! You qualify for a payout from the challenge pot.<br>
-    Message Mahir on WhatsApp to claim (pot funded by players, platform takes 20% fee as per terms).</p>`;
-  } else {
-    resultText += `<p>Keep practicing! Try another paper to improve your score and earn.</p>`;
-  }
-
-  resultDiv.innerHTML = resultText;
-  markSchemeDiv.innerHTML = schemeHtml;
-  markSchemeDiv.style.display = "block";
-  submitBtn.style.display = "none";
-};
-</script>
-
-</body>
-</html>
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`App running on port ${port}`);
+});
