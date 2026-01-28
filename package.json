@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "node-fetch": "^2.7.0" // For Groq fetch
+    "node-fetch": "^2.7.0"
   },
   "engines": {
     "node": ">=18"
